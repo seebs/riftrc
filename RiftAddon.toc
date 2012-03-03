@@ -1,0 +1,30 @@
+Identifier = "RiftRC"
+
+Version = "VERSION"
+
+Email = "seebs@seebs.net"
+
+Dependencies = { LibGetOpt = { "required", "before" } }
+Embed = { LibGetOpt = true }
+
+Name = {
+  English = "RiftRC",
+  French = "RiftRC",
+  German = "RiftRC",
+}
+NameShort = "RiftRC"
+
+SavedVariables = {
+  RiftRC_dotRiftRC = "global",
+}
+
+Description = {
+  English = "Startup commands for Rift."
+}
+
+RunOnStartup = {
+  "RiftRC.lua"
+}
+
+Environment = { "1.5", "1.6", "1.7", "1.8" }
+
