@@ -30,4 +30,7 @@ the lines of code are moved to the .trash component of the saved variable.
 If you want to use this addon, I bet that's enough for you to recover
 it.  :)
 
-Command: /rc (no args as of yet, planning to add some later)
+Command: /rc
+	/rc		Open editor window
+	/rc name	Open editor window, switch to buffer 'name'
+	/rc -r name[s]	Run the named buffers (displaying output)

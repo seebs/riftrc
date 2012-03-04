@@ -19,8 +19,9 @@ end
 
 function RiftRC.warn(fmt, ...)
   local out = string.format(fmt or 'nil', ...)
-  if RiftRC.rc_feedback then
+  if RiftRC.rc_feedback and RiftRC.window and RiftRC.window:GetVisible() then
     RiftRC.rc_feedback:SetText(out)
+    print(out)
   else
     print(out)
   end
@@ -95,6 +96,13 @@ function RiftRC.output(value)
 end
 
 function RiftRC.run_buffer(name, buffer)
+  if not buffer then
+    buffer = RiftRC.unsaved[name] or (RiftRC.list.buffer[name] and RiftRC.list.buffer[name].data)
+    if not buffer then
+      RiftRC.warn("Can't find buffer '%s' to run.", tostring(name))
+      return
+    end
+  end
   local code = table.concat(buffer, "\n")
   func, err = loadstring(code)
   if func then
@@ -109,7 +117,7 @@ function RiftRC.run_buffer(name, buffer)
   end
 end
 
-function RiftRC.run_rc(args)
+function RiftRC.run_rc()
   value = RiftRC.run_buffer('edit buffer', RiftRC.rc.buffer)
   RiftRC.output(value)
 end
@@ -227,9 +235,11 @@ function RiftRC.new_rc()
       break
     end
   end
+  RiftRC.output(nil)
+  RiftRC.unsaved[new_name] = {}
   RiftRC.list.buffer[new_name] = { autorun = true, data = {} }
-  RiftRC.load_buffer(new_name)
   RiftRC.show_buffer(RiftRC.list)
+  RiftRC.load_buffer(new_name)
 end
 
 function RiftRC.del_rc()
@@ -237,6 +247,32 @@ function RiftRC.del_rc()
   if name == 'riftrc' then
     return
   else
+    local best_guess = nil
+    --[[
+      If the one we picked was #1, we obviously want to go to #2.
+      If the one we picked was later, either we want the one after
+      it, or we want the one before it if it was the last one.  So,
+      we pick the one before it, and continue; if we get another
+      one, we use that one and stop looking.
+
+      Note that since you can't delete the riftrc member, in theory
+      there should always be at least one other...
+      ]]--
+    if RiftRC.list.indexed_buffer then
+      for index, value in ipairs(RiftRC.list.indexed_buffer) do
+	if best_guess then
+	  best_guess = value
+	  break
+	end
+        if value == name then
+	  if index == 1 then
+	    best_guess = RiftRC.list.indexed_buffer[2]
+	    break
+	  end
+	  best_guess = RiftRC.list.indexed_buffer[index - 1]
+	end
+      end
+    end
     RiftRC.sv.trash = RiftRC.sv.trash or {}
     if RiftRC.list.buffer[name] then
       RiftRC.sv.trash[name] = RiftRC.list.buffer[name].data
@@ -246,8 +282,8 @@ function RiftRC.del_rc()
       RiftRC.sv.trash[name] = RiftRC.unsaved[name]
     end
     RiftRC.unsaved[name] = nil
-    RiftRC.load_buffer('riftrc')
     RiftRC.show_buffer(RiftRC.list)
+    RiftRC.load_buffer(best_guess or 'riftrc')
     RiftRC.warn("Deleted %s. (Stored in RiftRC_dotRiftRC.trash['%s'])", name, name)
   end
 end
@@ -337,9 +373,7 @@ function RiftRC.makewindow()
   RiftRC.del_rcbutton:SetText("DELETE")
   RiftRC.del_rcbutton:SetEnabled(false)
 
-  RiftRC.check_scrollbars()
   RiftRC.load_buffer('riftrc')
-  RiftRC.show_buffer(RiftRC.rc)
   RiftRC.show_buffer(RiftRC.out)
   RiftRC.show_buffer(RiftRC.list)
   RiftRC.change_rc(1)
@@ -382,12 +416,18 @@ function RiftRC.select_buffer(index)
   if item then
     RiftRC.load_buffer(item)
   end
-  RiftRC.show_buffer(RiftRC.list)
 end
 
 function RiftRC.load_buffer(name)
   if RiftRC.edit_buffer then
     RiftRC.unsaved[RiftRC.edit_buffer] = RiftRC.shallowcopy(RiftRC.rc.buffer)
+  end
+  if not name then
+    name = RiftRC.edit_orig
+  end
+  if not RiftRC.unsaved[name] then
+    RiftRC.warn("No buffer named '%s'.", name)
+    return
   end
   RiftRC.rc.buffer = RiftRC.shallowcopy(RiftRC.unsaved[name])
   RiftRC.edit_buffer = name
@@ -410,6 +450,7 @@ function RiftRC.load_buffer(name)
     end
   end
   RiftRC.show_buffer(RiftRC.rc)
+  RiftRC.show_buffer(RiftRC.list)
   RiftRC.change_rc(1)
   RiftRC.message("Loaded %s.", name)
   if RiftRC.save_rcbutton then
@@ -510,6 +551,7 @@ function RiftRC.show_buffer(ui_spec)
       end
     end
   end
+  RiftRC.check_scrollbar(ui_spec)
 end
 
 function RiftRC.show_riftrc()
@@ -519,12 +561,17 @@ end
 function RiftRC.check_scrollbars()
   RiftRC.check_scrollbar(RiftRC.rc)
   RiftRC.check_scrollbar(RiftRC.out)
+  RiftRC.check_scrollbar(RiftRC.list)
 end
 
 function RiftRC.check_scrollbar(ui_spec)
-  if #ui_spec.buffer > ui_spec.lines then
+  local buffer = ui_spec.buffer
+  if ui_spec.interact == 'fancy' then
+    buffer = ui_spec.indexed_buffer
+  end
+  if #buffer > ui_spec.lines then
     if ui_spec.ui and ui_spec.ui.scrollbar then
-      ui_spec.ui.scrollbar:SetRange(0, #ui_spec.buffer - ui_spec.lines)
+      ui_spec.ui.scrollbar:SetRange(0, #buffer - ui_spec.lines)
       ui_spec.ui.scrollbar:SetPosition(ui_spec.offset or 0)
       ui_spec.ui.scrollbar:SetEnabled(true)
     end
@@ -624,14 +671,58 @@ function RiftRC.gui()
 end
 
 function RiftRC.slashcommand(args)
+  if not slashprint then
+    slashprint = Inspect.Addon.Detail('SlashPrint')
+    if slashprint then
+      slashprint = slashprint.data
+    end
+  end
   if not args then
     RiftRC.printf("Usage error.")
     return
   end
-  RiftRC.gui()
+  if args.n then
+    if #args.leftover_args > 0 or args.r then
+      RiftRC.warn("Can't specify arguments to new.")
+    else
+      RiftRC.gui()
+      RiftRC.new_rc()
+    end
+  end
+  if #args.leftover_args > 0 then
+    if args.r then
+      for _, name in ipairs(args.leftover_args) do
+        local value = RiftRC.run_buffer(name)
+	if value ~= nil then
+	  local pretty = {}
+	  if slashprint then
+	    slashprint.dump(pretty, value)
+	  else
+	    table.insert(pretty, tostring(value))
+	  end
+	  for _, line in ipairs(pretty) do
+	    print(line)
+	  end
+	end
+      end
+    else
+      if #args.leftover_args ~= 1 then
+        RiftRC.printf("Pick a single component.")
+	return
+      else
+        RiftRC.gui()
+	RiftRC.load_buffer(args.leftover_args[1])
+      end
+    end
+  else
+    RiftRC.gui()
+    if args.r then
+      RiftRC.run_rc()
+    end
+  end
 end
 
-Library.LibGetOpt.makeslash("", "RiftRC", "rc", RiftRC.slashcommand)
+Library.LibGetOpt.makeslash("nr", "RiftRC", "rc", RiftRC.slashcommand)
 
 table.insert(Event.Addon.SavedVariables.Load.End, { RiftRC.variables_loaded, "RiftRC", "variable loaded hook" })
 table.insert(Event.Addon.Startup.End, { RiftRC.run_buffers, "RiftRC", "run riftrc" })
