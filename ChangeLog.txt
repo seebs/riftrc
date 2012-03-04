@@ -1,6 +1,13 @@
 2012/03/03:
 	* Display output
 	* Embed slashprint
+	* Support multiple snippets
+	* Checkbox for autorun
+	* Delete button
+	* Renaming
+	* Smarter handling of button availability
+	* Autoindent
+
 
 2012/03/02:
 	* Start new toy!
