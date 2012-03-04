@@ -4,8 +4,8 @@ Version = "VERSION"
 
 Email = "seebs@seebs.net"
 
-Dependencies = { LibGetOpt = { "required", "before" } }
-Embed = { LibGetOpt = true }
+Dependencies = { LibGetOpt = { "required", "before" }, SlashPrint = { "required", "before" } }
+Embed = { LibGetOpt = true, SlashPrint = true }
 
 Name = {
   English = "RiftRC",

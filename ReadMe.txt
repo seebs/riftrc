@@ -4,14 +4,17 @@ is analogous to .cshrc/.bashrc/etcetera.
 
 Saved variables:
 	RiftRC_riftrc = {
-	  riftrc = { string, string, ... },
-	  scratch = { string, string, ... },
+	  buffers = {
+	    name = { 
+	      autorun = true,
+	      data = { string, string, ... }
+	    },
+	  },
 	  window_x = number,
 	  window_y = number,
 	}
 
-The "riftrc" string will be loaded automatically, and executed automatically.
+If the string returns a value, it is displayed in the lower window frame
+when the window is open.
 
-The "scratch" string is loaded automatically, but not executed automatically.
-
-Command: /riftrc
+Command: /rc

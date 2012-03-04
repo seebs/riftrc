@@ -1,2 +1,6 @@
+2012/03/03:
+	* Display output
+	* Embed slashprint
+
 2012/03/02:
 	* Start new toy!

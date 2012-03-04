@@ -1,5 +1,5 @@
-VERSION=0.1
+VERSION=0.2
 PACKAGE=RiftRC
-EMBEDS=getopt
+EMBEDS=getopt slashprint
 include ../addon.mk
 
