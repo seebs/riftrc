@@ -34,6 +34,12 @@ function RiftRC.message(fmt, ...)
   end
 end
 
+function RiftRC.update()
+  if RiftRC.live and RiftRC.window and RiftRC.window:GetVisible() then
+    RiftRC.output(RiftRC.stash_value, true)
+  end
+end
+
 function RiftRC.shallowcopy(tab)
   local new = {}
   if tab and type(tab) == 'table' then
@@ -76,7 +82,8 @@ function RiftRC.run_buffers()
   end
 end
 
-function RiftRC.output(value)
+function RiftRC.output(value, quiet)
+  RiftRC.stash_value = value
   local pretty = {}
   if not slashprint then
     slashprint = Inspect.Addon.Detail('SlashPrint')
@@ -86,7 +93,9 @@ function RiftRC.output(value)
   end
   if slashprint then
     slashprint.dump(pretty, value)
-    RiftRC.message("Dumped %s into table, %d item%s.", tostring(value), #pretty, #pretty == 1 and 's' or '')
+    if not quiet then
+      RiftRC.message("Dumped %s into table, %d item%s.", tostring(value), #pretty, #pretty == 1 and 's' or '')
+    end
   else
     table.insert(pretty, tostring(value))
   end
@@ -681,16 +690,27 @@ function RiftRC.slashcommand(args)
     RiftRC.printf("Usage error.")
     return
   end
+  if args.l then
+    RiftRC.live = not RiftRC.live
+  end
   if args.n then
     if #args.leftover_args > 0 or args.r then
-      RiftRC.warn("Can't specify arguments to new.")
+      RiftRC.warn("Can't run, or specify arguments to, new buffer.")
     else
       RiftRC.gui()
       RiftRC.new_rc()
     end
   end
   if #args.leftover_args > 0 then
-    if args.r then
+    if args.e then
+      if #args.leftover_args ~= 1 then
+        RiftRC.printf("Pick a single component.")
+	return
+      else
+        RiftRC.gui()
+	RiftRC.load_buffer(args.leftover_args[1])
+      end
+    else
       for _, name in ipairs(args.leftover_args) do
         local value = RiftRC.run_buffer(name)
 	if value ~= nil then
@@ -705,24 +725,18 @@ function RiftRC.slashcommand(args)
 	  end
 	end
       end
-    else
-      if #args.leftover_args ~= 1 then
-        RiftRC.printf("Pick a single component.")
-	return
-      else
-        RiftRC.gui()
-	RiftRC.load_buffer(args.leftover_args[1])
-      end
+      return
     end
   else
     RiftRC.gui()
-    if args.r then
-      RiftRC.run_rc()
-    end
+  end
+  if args.r then
+    RiftRC.run_rc()
   end
 end
 
-Library.LibGetOpt.makeslash("nr", "RiftRC", "rc", RiftRC.slashcommand)
+Library.LibGetOpt.makeslash("elnr", "RiftRC", "rc", RiftRC.slashcommand)
 
+table.insert(Event.System.Update.Begin, { RiftRC.update, "RiftRC", "update hook" })
 table.insert(Event.Addon.SavedVariables.Load.End, { RiftRC.variables_loaded, "RiftRC", "variable loaded hook" })
 table.insert(Event.Addon.Startup.End, { RiftRC.run_buffers, "RiftRC", "run riftrc" })

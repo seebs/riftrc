@@ -32,5 +32,7 @@ it.  :)
 
 Command: /rc
 	/rc		Open editor window
-	/rc name	Open editor window, switch to buffer 'name'
-	/rc -r name[s]	Run the named buffers (displaying output)
+	/rc -e name	Open editor window, switch to named buffer
+	/rc [names]	Run the selected names
+	/rc -r -e name	Open editor window, switch to named buffer, run it
+	/rc -l		Live mode:  Refresh output every tick.
