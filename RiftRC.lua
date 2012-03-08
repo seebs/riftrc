@@ -52,8 +52,11 @@ end
 
 function RiftRC.variables_loaded(addon)
   if addon == 'RiftRC' then
-    RiftRC_dotRiftRC = RiftRC_dotRiftRC or { buffers = {}, }
+    RiftRC_dotRiftRC = RiftRC_dotRiftRC or { buffers = { riftrc = { data = {}, autorun = true } }, }
     RiftRC.sv = RiftRC_dotRiftRC
+    if not RiftRC.sv.buffers.riftrc then
+      RiftRC.sv.buffers.riftrc = { data = {}, autorun = true }
+    end
     for name, value in pairs(RiftRC.sv.buffers) do
       RiftRC.unsaved[name] = RiftRC.shallowcopy(value.data)
     end
