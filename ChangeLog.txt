@@ -1,3 +1,6 @@
+2012/03/26:
+	* Fix errors handling returns and backspaces in some cases.
+
 2012/03/07:
 	* Fix initial setup without saved variables to create riftrc again.
 

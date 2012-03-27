@@ -604,35 +604,35 @@ function RiftRC.key_press(idx, event, key)
   local index = idx + RiftRC.rc.offset
   if key then
     if string.byte(key) == 8 then
-      if idx > 1 and cursor < 1 then
+      if index > 1 and cursor < 1 then
 	old = RiftRC.rc.buffer[index - 1] or ''
-	RiftRC.rc.ui.fields[idx - 1]:SetKeyFocus(true)
 	RiftRC.rc.buffer[index - 1] = old .. ' ' .. text
-	RiftRC.rc.ui.fields[idx - 1]:SetText(RiftRC.rc.buffer[index - 1])
-	RiftRC.rc.ui.fields[idx - 1]:SetCursor(#old + 1)
+        table.remove(RiftRC.rc.buffer, index)
 	if RiftRC.rc.offset > 0 then
 	  RiftRC.rc.offset = RiftRC.rc.offset - 1
+	else
+	  idx = idx - 1
 	end
-        table.remove(RiftRC.rc.buffer, index)
 	RiftRC.check_scrollbar(RiftRC.rc)
+	RiftRC.show_riftrc()
+	RiftRC.rc.ui.fields[idx]:SetKeyFocus(true)
+	RiftRC.rc.ui.fields[idx]:SetCursor(#old + 1)
       end
-      RiftRC.show_riftrc()
     elseif string.byte(key) == 13 then
       local spaces = string.match(text, '^(%s*)') or ''
       if string.find(text, '{$') or string.find(text, ' do$') or string.find(text, ' then$') then
         spaces = spaces .. '  '
       end
-      RiftRC.printf("in <%s>: <%s> leading space", text, spaces)
       before = string.sub(text, 1, cursor)
       after = string.sub(text, cursor + 1)
       RiftRC.rc.buffer[index] = before
       table.insert(RiftRC.rc.buffer, index + 1, spaces .. after)
-      RiftRC.check_scrollbar(RiftRC.rc)
       if #RiftRC.rc.buffer > RiftRC.rc.lines then
         RiftRC.rc.offset = RiftRC.rc.offset + 1
       else
         idx = idx + 1
       end
+      RiftRC.check_scrollbar(RiftRC.rc)
       RiftRC.show_riftrc()
       RiftRC.rc.ui.fields[idx]:SetKeyFocus(true)
       RiftRC.rc.ui.fields[idx]:SetCursor(#spaces)
