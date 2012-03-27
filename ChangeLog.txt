@@ -1,3 +1,6 @@
+2012/03/27:
+	* Rework display of buffer list to use LibItemList.
+
 2012/03/26:
 	* Fix errors handling returns and backspaces in some cases.
 

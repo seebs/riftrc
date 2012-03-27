@@ -8,7 +8,6 @@ local slashprint
 
 RiftRC.rc = { buffer = {}, lines = 13, interact = true, point = "TOPLEFT", yoffset = 15 }
 RiftRC.out = { buffer = {}, lines = 9, interact = false, point = "BOTTOMLEFT", yoffset = -30 }
-RiftRC.list = { buffer = {}, lines = 10, interact = 'fancy', xoffset = -5, yoffset = 15, height = 48, width = 195, point = "TOPRIGHT" }
 RiftRC.edit_buffer = nil
 RiftRC.edit_orig = nil
 RiftRC.unsaved = {}
@@ -57,9 +56,12 @@ function RiftRC.variables_loaded(addon)
     if not RiftRC.sv.buffers.riftrc then
       RiftRC.sv.buffers.riftrc = { data = {}, autorun = true }
     end
+    RiftRC.sorted_buffers = {}
     for name, value in pairs(RiftRC.sv.buffers) do
       RiftRC.unsaved[name] = RiftRC.shallowcopy(value.data)
+      table.insert(RiftRC.sorted_buffers, name)
     end
+    table.sort(RiftRC.sorted_buffers)
     RiftRC.load_buffer('riftrc')
   end
 end
@@ -109,7 +111,7 @@ end
 
 function RiftRC.run_buffer(name, buffer)
   if not buffer then
-    buffer = RiftRC.unsaved[name] or (RiftRC.list.buffer[name] and RiftRC.list.buffer[name].data)
+    buffer = RiftRC.unsaved[name] or (RiftRC.list.u.buffers[name] and RiftRC.list.u.buffers[name].data)
     if not buffer then
       RiftRC.warn("Can't find buffer '%s' to run.", tostring(name))
       return
@@ -184,56 +186,18 @@ function RiftRC.subUI(window, ui_spec)
 
   tab.fields = {}
   tab.labels = {}
-  if ui_spec.interact == 'fancy' then
-    tab.outer = {}
-    tab.borders = {}
-    tab.checks = {}
-    tab.line_counts = {}
-  end
   for i = 1, ui_spec.lines do
-    if ui_spec.interact == 'fancy' then
-      tab.outer[i] = UI.CreateFrame("Frame", "list" .. i, tab.background)
-      tab.outer[i]:SetPoint("TOPLEFT", tab.background, "TOPLEFT", 5, 5 + line_height * (i - 1))
-      tab.outer[i]:SetWidth(width - w - 10)
-      tab.outer[i]:SetHeight(line_height)
-      tab.outer[i]:SetBackgroundColor(0, 0, 0, 0)
-
-      tab.borders[i] = UI.CreateFrame("Frame", "list" .. i, tab.outer[i])
-      tab.borders[i]:SetPoint("TOPLEFT", tab.outer[i], "TOPLEFT", 1, 1)
-      tab.borders[i]:SetBackgroundColor(0.3, 0.3, 0.3, 0.8)
-      tab.borders[i]:SetPoint("BOTTOMRIGHT", tab.outer[i], "BOTTOMRIGHT", -1, -1)
-      tab.fields[i] = UI.CreateFrame("Frame", "list" .. i, tab.borders[i])
-      tab.fields[i]:SetPoint("TOPLEFT", tab.borders[i], "TOPLEFT", 2, 2)
-      tab.fields[i]:SetPoint("BOTTOMRIGHT", tab.borders[i], "BOTTOMRIGHT", -2, -2)
-      tab.fields[i]:SetBackgroundColor(0.1, 0.1, 0.1, 0.8)
-      tab.fields[i].Event.LeftClick = function() RiftRC.select_buffer(i) end
-
-      tab.checks[i] = UI.CreateFrame("RiftCheckbox", "check" .. i, tab.fields[i])
-      tab.checks[i]:SetPoint("BOTTOMRIGHT", tab.fields[i], "BOTTOMRIGHT", -2, -2)
-      tab.checks[i].Event.CheckboxChange = function() RiftRC.check_box(i) end
-
-      tab.labels[i] = UI.CreateFrame("Text", "RiftRC", tab.fields[i])
-      tab.labels[i]:SetPoint("TOPLEFT", tab.fields[i], "TOPLEFT", 2, 2)
-      tab.labels[i]:SetFontColor(0.9, 0.9, 0.9, 1)
-
-      tab.line_counts[i] = UI.CreateFrame("Text", "RiftRC", tab.fields[i])
-      tab.line_counts[i]:SetPoint("TOPLEFT", tab.fields[i], "TOPLEFT", 2, 22)
-      tab.line_counts[i]:SetFontColor(0.9, 0.9, 0.7, 1)
-      -- do nothing yet
-      -- do nothing yet
-    else
-      tab.fields[i] = UI.CreateFrame(ui_spec.interact and "RiftTextfield" or "Text", "RiftRC", tab.background)
-      tab.fields[i]:SetPoint("TOPLEFT", tab.background, "TOPLEFT", 35, 5 + line_height * (i - 1))
-      tab.fields[i]:SetHeight(line_height)
-      tab.fields[i]:SetWidth(width - 40 - w)
-      tab.fields[i]:SetBackgroundColor(0, 0, 0, 0.8)
-      tab.labels[i] = UI.CreateFrame("Text", "RiftRC", tab.background)
-      tab.labels[i]:SetPoint("TOPRIGHT", tab.background, "TOPLEFT", 33, 5 + line_height * (i - 1))
-      tab.labels[i]:SetFontColor(0.7, 0.7, 0.4, 1)
-      if ui_spec.interact then
-	tab.fields[i].Event.TextfieldChange = function() RiftRC.change_rc(i) end
-	tab.fields[i].Event.KeyDown = function(event, key) RiftRC.key_press(i, event, key) end
-      end
+    tab.fields[i] = UI.CreateFrame(ui_spec.interact and "RiftTextfield" or "Text", "RiftRC", tab.background)
+    tab.fields[i]:SetPoint("TOPLEFT", tab.background, "TOPLEFT", 35, 5 + line_height * (i - 1))
+    tab.fields[i]:SetHeight(line_height)
+    tab.fields[i]:SetWidth(width - 40 - w)
+    tab.fields[i]:SetBackgroundColor(0, 0, 0, 0.8)
+    tab.labels[i] = UI.CreateFrame("Text", "RiftRC", tab.background)
+    tab.labels[i]:SetPoint("TOPRIGHT", tab.background, "TOPLEFT", 33, 5 + line_height * (i - 1))
+    tab.labels[i]:SetFontColor(0.7, 0.7, 0.4, 1)
+    if ui_spec.interact then
+      tab.fields[i].Event.TextfieldChange = function() RiftRC.change_rc(i) end
+      tab.fields[i].Event.KeyDown = function(event, key) RiftRC.key_press(i, event, key) end
     end
   end
   return tab
@@ -243,14 +207,15 @@ function RiftRC.new_rc()
   local new_name
   for i = 1, 100 do
     new_name = 'untitled ' .. i
-    if not RiftRC.list.buffer[new_name] then
+    if not RiftRC.list.u.buffers[new_name] then
       break
     end
   end
   RiftRC.output(nil)
   RiftRC.unsaved[new_name] = {}
-  RiftRC.list.buffer[new_name] = { autorun = true, data = {} }
-  RiftRC.show_buffer(RiftRC.list)
+  RiftRC.list.u.buffers[new_name] = { autorun = true, data = {} }
+  table.insert(RiftRC.list.data, new_name)
+  RiftRC.list:display()
   RiftRC.load_buffer(new_name)
 end
 
@@ -260,6 +225,7 @@ function RiftRC.del_rc()
     return
   else
     local best_guess = nil
+    local this_one = nil
     --[[
       If the one we picked was #1, we obviously want to go to #2.
       If the one we picked was later, either we want the one after
@@ -270,31 +236,33 @@ function RiftRC.del_rc()
       Note that since you can't delete the riftrc member, in theory
       there should always be at least one other...
       ]]--
-    if RiftRC.list.indexed_buffer then
-      for index, value in ipairs(RiftRC.list.indexed_buffer) do
+    if RiftRC.list.data then
+      for index, value in ipairs(RiftRC.list.data) do
 	if best_guess then
 	  best_guess = value
 	  break
 	end
         if value == name then
+	  this_one = index
 	  if index == 1 then
-	    best_guess = RiftRC.list.indexed_buffer[2]
+	    best_guess = RiftRC.list.data[2]
 	    break
 	  end
-	  best_guess = RiftRC.list.indexed_buffer[index - 1]
+	  best_guess = RiftRC.list.data[index - 1]
 	end
       end
     end
+    table.remove(RiftRC.list.data, this_one)
     RiftRC.sv.trash = RiftRC.sv.trash or {}
-    if RiftRC.list.buffer[name] then
-      RiftRC.sv.trash[name] = RiftRC.list.buffer[name].data
+    if RiftRC.list.u.buffers[name] then
+      RiftRC.sv.trash[name] = RiftRC.list.u.buffers[name].data
     end
-    RiftRC.list.buffer[name] = nil
+    RiftRC.list.u.buffers[name] = nil
     if RiftRC.unsaved[name] then
       RiftRC.sv.trash[name] = RiftRC.unsaved[name]
     end
     RiftRC.unsaved[name] = nil
-    RiftRC.show_buffer(RiftRC.list)
+    RiftRC.list:display()
     RiftRC.load_buffer(best_guess or 'riftrc')
     RiftRC.warn("Deleted %s. (Stored in RiftRC_dotRiftRC.trash['%s'])", name, name)
   end
@@ -341,8 +309,30 @@ function RiftRC.makewindow()
 
   RiftRC.rc.ui = RiftRC.subUI(window:GetContent(), RiftRC.rc)
   RiftRC.out.ui = RiftRC.subUI(window:GetContent(), RiftRC.out)
-  RiftRC.list.ui = RiftRC.subUI(window:GetContent(), RiftRC.list)
-  RiftRC.list.buffer = RiftRC.sv.buffers
+
+  RiftRC.listframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
+  RiftRC.listframe:SetPoint('TOPRIGHT', window:GetContent(), 'TOPRIGHT', -5, 20)
+  RiftRC.listframe:SetWidth(185)
+  RiftRC.listframe:SetHeight(479)
+
+  local list_aux = {
+    borders = {},
+    checks = {},
+    fields = {},
+    labels = {},
+    line_counts = {},
+  }
+
+  RiftRC.list = Library.LibItemList.create(RiftRC.listframe, 'RiftRC', list_aux, 10, 'RIGHT', RiftRC.make_listitem, RiftRC.show_listitem, RiftRC.select_listitem)
+  RiftRC.list.u.buffers = RiftRC.sv.buffers
+
+  for idx, name in ipairs(RiftRC.sorted_buffers) do
+    if name == 'riftrc' then
+      RiftRC.list.selected = idx
+      break
+    end
+  end
+  RiftRC.list:display(RiftRC.sorted_buffers)
 
   local label = UI.CreateFrame("Text", "RiftRC", window)
   label:SetPoint("TOPLEFT", RiftRC.rc.ui.background, "BOTTOMLEFT", 35, -5)
@@ -387,48 +377,88 @@ function RiftRC.makewindow()
 
   RiftRC.load_buffer('riftrc')
   RiftRC.show_buffer(RiftRC.out)
-  RiftRC.show_buffer(RiftRC.list)
+  RiftRC.list:display()
   RiftRC.change_rc(1)
 
   return window
 end
 
-function RiftRC.check_box(index)
-  local ui_spec = RiftRC.list
-  if not ui_spec then
-    return
-  end
-  if ui_spec.ui and ui_spec.ui.scrollbar then
-    ui_spec.offset = math.floor(ui_spec.ui.scrollbar:GetPosition())
-  else
-    ui_spec.offset = 0
-  end
-  local check = ui_spec.ui.checks[index]:GetChecked()
-  local index = index + ui_spec.offset
-  local item = ui_spec.indexed_buffer and ui_spec.indexed_buffer[index]
-  if item and RiftRC.list.buffer[item] then
-    RiftRC.list.buffer[item].autorun = check
-  end
-  RiftRC.show_buffer(RiftRC.list)
+-- interactions with LibItemList
+function RiftRC.make_listitem(tab, frame, i)
+
+  tab.u.borders[i] = UI.CreateFrame("Frame", "list" .. i, frame)
+  tab.u.borders[i]:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, 1)
+  tab.u.borders[i]:SetBackgroundColor(0.3, 0.3, 0.3, 0.8)
+  tab.u.borders[i]:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, -1)
+  tab.u.borders[i]:SetMouseMasking('limited')
+
+  tab.u.fields[i] = UI.CreateFrame("Frame", "list" .. i, tab.u.borders[i])
+  tab.u.fields[i]:SetPoint("TOPLEFT", tab.u.borders[i], "TOPLEFT", 2, 2)
+  tab.u.fields[i]:SetPoint("BOTTOMRIGHT", tab.u.borders[i], "BOTTOMRIGHT", -2, -2)
+  tab.u.fields[i]:SetBackgroundColor(0.1, 0.1, 0.1, 0.8)
+  tab.u.fields[i]:SetMouseMasking('limited')
+
+  tab.u.checks[i] = UI.CreateFrame("RiftCheckbox", "check" .. i, tab.u.fields[i])
+  tab.u.checks[i]:SetPoint("BOTTOMRIGHT", tab.u.fields[i], "BOTTOMRIGHT", -2, -2)
+  tab.u.checks[i].Event.CheckboxChange = function() RiftRC.check_box(i) end
+
+  tab.u.labels[i] = UI.CreateFrame("Text", "RiftRC", tab.u.fields[i])
+  tab.u.labels[i]:SetPoint("TOPLEFT", tab.u.fields[i], "TOPLEFT", 2, 2)
+  tab.u.labels[i]:SetFontColor(0.9, 0.9, 0.9, 1)
+  tab.u.labels[i]:SetMouseMasking('limited')
+
+  tab.u.line_counts[i] = UI.CreateFrame("Text", "RiftRC", tab.u.fields[i])
+  tab.u.line_counts[i]:SetPoint("TOPLEFT", tab.u.fields[i], "TOPLEFT", 2, 22)
+  tab.u.line_counts[i]:SetFontColor(0.9, 0.9, 0.7, 1)
+  tab.u.line_counts[i]:SetMouseMasking('limited')
 end
 
-function RiftRC.select_buffer(index)
-  local ui_spec = RiftRC.list
-  if not ui_spec then
+function RiftRC.show_listitem(frametable, i, itemtable, itemindex, selected)
+  local item = itemtable[itemindex]
+  if item then
+    local details = RiftRC.sv.buffers[item]
+    frametable.u.labels[i]:SetText(tostring(item))
+    frametable.u.line_counts[i]:SetText("Lines: " .. #details.data)
+    if selected then
+      frametable.u.borders[i]:SetBackgroundColor(0.5, 0.5, 0.3, 0.8)
+    else
+      frametable.u.borders[i]:SetBackgroundColor(0.3, 0.3, 0.3, 0.8)
+    end
+    frametable.u.checks[i]:SetVisible(true)
+    frametable.u.checks[i]:SetChecked(details.autorun or false)
+  else
+    frametable.u.labels[i]:SetText('')
+    frametable.u.line_counts[i]:SetText('')
+    frametable.u.borders[i]:SetBackgroundColor(0.3, 0.3, 0.3, 0.8)
+    frametable.u.checks[i]:SetVisible(false)
+  end
+end
+
+function RiftRC.select_listitem(frametable, frameindex, itemtable, itemindex)
+  local tab = frametable
+  if not tab then
     return
   end
-  RiftRC.message('')
-  if ui_spec.ui and ui_spec.ui.scrollbar then
-    ui_spec.offset = math.floor(ui_spec.ui.scrollbar:GetPosition())
-  else
-    ui_spec.offset = 0
-  end
-  index = index + ui_spec.offset
-  item = ui_spec.indexed_buffer and ui_spec.indexed_buffer[index]
+  item = itemtable[itemindex]
   if item then
     RiftRC.load_buffer(item)
   end
 end
+
+function RiftRC.check_box(idx)
+  local tab = RiftRC.list
+  if not tab then
+    return
+  end
+  local check = tab.u.checks[idx]:GetChecked()
+  local index = idx + tab.offset
+  local item = tab.data and tab.data[index]
+  if item and tab.u.buffers[item] then
+    tab.u.buffers[item].autorun = check
+  end
+  RiftRC.list:display()
+end
+
 
 function RiftRC.load_buffer(name)
   if RiftRC.edit_buffer then
@@ -461,8 +491,18 @@ function RiftRC.load_buffer(name)
       RiftRC.buffer_label:SetVisible(true)
     end
   end
+  if RiftRC.list and RiftRC.list.data then
+    for idx, itemname in ipairs(RiftRC.list.data) do
+      if itemname == name then
+	RiftRC.list.selected = idx
+	break
+      end
+    end
+  end
   RiftRC.show_buffer(RiftRC.rc)
-  RiftRC.show_buffer(RiftRC.list)
+  if RiftRC.list then
+    RiftRC.list:display()
+  end
   RiftRC.change_rc(1)
   RiftRC.message("Loaded %s.", name)
   if RiftRC.save_rcbutton then
@@ -495,14 +535,14 @@ function RiftRC.save_rc()
   if name ~= oldname then
     RiftRC.unsaved[name] = RiftRC.unsaved[oldname]
     RiftRC.unsaved[oldname] = nil
-    RiftRC.list.buffer[name] = RiftRC.list.buffer[oldname]
-    RiftRC.list.buffer[oldname] = nil
+    RiftRC.list.u.buffers[name] = RiftRC.list.u.buffers[oldname]
+    RiftRC.list.u.buffers[oldname] = nil
     RiftRC.warn("Renaming %s to %s.", oldname, name)
     RiftRC.edit_orig = RiftRC.edit_buffer
   else
     RiftRC.warn("Saving %s.", RiftRC.edit_buffer)
   end
-  local buff = RiftRC.list.buffer[name]
+  local buff = RiftRC.list.u.buffers[name]
   if not buff then
     RiftRC.message("Huh? Can't find buffer for '%s'.", name)
   else
@@ -511,7 +551,7 @@ function RiftRC.save_rc()
   if RiftRC.rc_savebutton then
     RiftRC.rc_savebutton:SetEnabled(false)
   end
-  RiftRC.show_buffer(RiftRC.list)
+  RiftRC.list:display()
 end
 
 function RiftRC.show_buffer(ui_spec)
@@ -537,26 +577,12 @@ function RiftRC.show_buffer(ui_spec)
     local line = indexed_buffer[index]
     if line then
       if ui_spec.interact == 'fancy' then
-        local details = ui_spec.buffer[line]
-        ui_spec.ui.labels[i]:SetText(tostring(line))
-        ui_spec.ui.line_counts[i]:SetText("Lines: " .. #details.data)
-	if line == RiftRC.edit_buffer then
-          ui_spec.ui.borders[i]:SetBackgroundColor(0.5, 0.5, 0.3, 0.8)
-	else
-          ui_spec.ui.borders[i]:SetBackgroundColor(0.3, 0.3, 0.3, 0.8)
-	end
-	ui_spec.ui.checks[i]:SetVisible(true)
-	ui_spec.ui.checks[i]:SetChecked(details.autorun or false)
       else
         ui_spec.ui.fields[i]:SetText(line)
         ui_spec.ui.labels[i]:SetText(tostring(index))
       end
     else
       if ui_spec.interact == 'fancy' then
-        ui_spec.ui.labels[i]:SetText('')
-        ui_spec.ui.line_counts[i]:SetText('')
-	ui_spec.ui.borders[i]:SetBackgroundColor(0.3, 0.3, 0.3, 0.8)
-	ui_spec.ui.checks[i]:SetVisible(false)
       else
         ui_spec.ui.fields[i]:SetText('')
         ui_spec.ui.labels[i]:SetText('')
@@ -573,7 +599,7 @@ end
 function RiftRC.check_scrollbars()
   RiftRC.check_scrollbar(RiftRC.rc)
   RiftRC.check_scrollbar(RiftRC.out)
-  RiftRC.check_scrollbar(RiftRC.list)
+  RiftRC.list:check_scrollbar()
 end
 
 function RiftRC.check_scrollbar(ui_spec)
