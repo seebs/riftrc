@@ -6,11 +6,10 @@
 local addoninfo, RiftRC = ...
 local slashprint
 
-RiftRC.rc = { buffer = {}, lines = 13, interact = true, point = "TOPLEFT", yoffset = 15 }
-RiftRC.out = { buffer = {}, lines = 9, interact = false, point = "BOTTOMLEFT", yoffset = -30 }
 RiftRC.edit_buffer = nil
 RiftRC.edit_orig = nil
 RiftRC.unsaved = {}
+RiftRC.buffer = ''
 
 function RiftRC.printf(fmt, ...)
   print(string.format(fmt or 'nil', ...))
@@ -39,26 +38,20 @@ function RiftRC.update()
   end
 end
 
-function RiftRC.shallowcopy(tab)
-  local new = {}
-  if tab and type(tab) == 'table' then
-    for k, v in pairs(tab) do 
-      new[k] = v
-    end
-  end
-  return new
-end
-
 function RiftRC.variables_loaded(addon)
   if addon == 'RiftRC' then
-    RiftRC_dotRiftRC = RiftRC_dotRiftRC or { buffers = { riftrc = { data = {}, autorun = true } }, }
+    RiftRC_dotRiftRC = RiftRC_dotRiftRC or { buffers = { riftrc = { data = '', autorun = true } }, }
     RiftRC.sv = RiftRC_dotRiftRC
     if not RiftRC.sv.buffers.riftrc then
-      RiftRC.sv.buffers.riftrc = { data = {}, autorun = true }
+      RiftRC.sv.buffers.riftrc = { data = '', autorun = true }
     end
     RiftRC.sorted_buffers = {}
     for name, value in pairs(RiftRC.sv.buffers) do
-      RiftRC.unsaved[name] = RiftRC.shallowcopy(value.data)
+      if type(value.data) == 'table' then
+        value.data = table.concat(value.data, '\n')
+      end
+      value.data = string.gsub(value.data, '\r', '\n')
+      RiftRC.unsaved[name] = value.data
       table.insert(RiftRC.sorted_buffers, name)
     end
     table.sort(RiftRC.sorted_buffers)
@@ -90,6 +83,9 @@ end
 function RiftRC.output(value, quiet)
   RiftRC.stash_value = value
   local pretty = {}
+  if not RiftRC.out or not RiftRC.out.text then
+    return
+  end
   if not slashprint then
     slashprint = Inspect.Addon.Detail('SlashPrint')
     if slashprint then
@@ -99,14 +95,13 @@ function RiftRC.output(value, quiet)
   if slashprint then
     slashprint.dump(pretty, value)
     if not quiet then
-      RiftRC.message("Dumped %s into table, %d item%s.", tostring(value), #pretty, #pretty == 1 and 's' or '')
+      RiftRC.message("Dumped %s into table, %d item%s.", tostring(value), #pretty, #pretty ~= 1 and 's' or '')
     end
   else
     table.insert(pretty, tostring(value))
   end
-  RiftRC.out.buffer = pretty
-  RiftRC.check_scrollbar(RiftRC.out)
-  RiftRC.show_buffer(RiftRC.out)
+  RiftRC.out:text(table.concat(pretty, '\n'))
+  RiftRC.out:check_scrollbar()
 end
 
 function RiftRC.run_buffer(name, buffer)
@@ -117,8 +112,7 @@ function RiftRC.run_buffer(name, buffer)
       return
     end
   end
-  local code = table.concat(buffer, "\n")
-  func, err = loadstring(code)
+  func, err = loadstring(buffer)
   if func then
     local status, value = pcall(func)
     if not status then
@@ -132,7 +126,7 @@ function RiftRC.run_buffer(name, buffer)
 end
 
 function RiftRC.run_rc()
-  value = RiftRC.run_buffer('edit buffer', RiftRC.rc.buffer)
+  value = RiftRC.run_buffer('edit buffer', RiftRC.buffer)
   RiftRC.output(value)
 end
 
@@ -145,62 +139,8 @@ end
 
 function RiftRC.closewindow()
   if RiftRC.window then
-    for i, frame in pairs(RiftRC.rc.ui.fields) do
-      frame:SetKeyFocus(false)
-    end
     RiftRC.window:SetVisible(false)
   end
-end
-
-function RiftRC.subUI(window, ui_spec)
-  local tab = {}
-
-  local line_height, xoffset, yoffset
-
-  line_height = ui_spec.height or 20
-  xoffset = ui_spec.xoffset or 5
-  yoffset = ui_spec.yoffset or 0
-  tab.background = UI.CreateFrame("Frame", "RiftRC", window)
-  tab.background:SetPoint(ui_spec.point, window, ui_spec.point, xoffset, yoffset)
-  tab.background:SetHeight(ui_spec.lines * line_height + 10)
-  tab.background:SetWidth(ui_spec.width or (window:GetWidth() - 200))
-  -- for debugging, set to non-zero alpha
-  tab.background:SetBackgroundColor(0.1, 0.1, 0.6, 0)
-
-  local width = tab.background:GetWidth()
-  local height = tab.background:GetHeight()
-
-  tab.scrollbar = UI.CreateFrame("RiftScrollbar", "RiftRC", tab.background)
-  tab.scrollbar:SetPoint("TOPRIGHT", tab.background, "TOPRIGHT", -2, 5)
-  tab.scrollbar:SetHeight(height - 10)
-  -- Only active when there is scrolletry to do
-  tab.scrollbar:SetEnabled(false)
-  tab.scrollbar:SetRange(0, 1)
-  tab.scrollbar:SetPosition(0)
-  tab.scrollbar.Event.ScrollbarChange = function() RiftRC.show_buffer(ui_spec) end
-  tab.background.Event.WheelBack = function() tab.scrollbar:Nudge(3) end
-  tab.background.Event.WheelForward = function() tab.scrollbar:Nudge(-3) end
-  local w = tab.scrollbar:GetWidth()
-
-  ui_spec.offset = 0
-
-  tab.fields = {}
-  tab.labels = {}
-  for i = 1, ui_spec.lines do
-    tab.fields[i] = UI.CreateFrame(ui_spec.interact and "RiftTextfield" or "Text", "RiftRC", tab.background)
-    tab.fields[i]:SetPoint("TOPLEFT", tab.background, "TOPLEFT", 35, 5 + line_height * (i - 1))
-    tab.fields[i]:SetHeight(line_height)
-    tab.fields[i]:SetWidth(width - 40 - w)
-    tab.fields[i]:SetBackgroundColor(0, 0, 0, 0.8)
-    tab.labels[i] = UI.CreateFrame("Text", "RiftRC", tab.background)
-    tab.labels[i]:SetPoint("TOPRIGHT", tab.background, "TOPLEFT", 33, 5 + line_height * (i - 1))
-    tab.labels[i]:SetFontColor(0.7, 0.7, 0.4, 1)
-    if ui_spec.interact then
-      tab.fields[i].Event.TextfieldChange = function() RiftRC.change_rc(i) end
-      tab.fields[i].Event.KeyDown = function(event, key) RiftRC.key_press(i, event, key) end
-    end
-  end
-  return tab
 end
 
 function RiftRC.new_rc()
@@ -213,7 +153,7 @@ function RiftRC.new_rc()
   end
   RiftRC.output(nil)
   RiftRC.unsaved[new_name] = {}
-  RiftRC.list.u.buffers[new_name] = { autorun = true, data = {} }
+  RiftRC.list.u.buffers[new_name] = { autorun = true, data = '' }
   table.insert(RiftRC.list.data, new_name)
   RiftRC.list:display()
   RiftRC.load_buffer(new_name)
@@ -307,8 +247,26 @@ function RiftRC.makewindow()
   RiftRC.buffer_field:SetText("edit")
   RiftRC.buffer_field:SetVisible(true)
 
-  RiftRC.rc.ui = RiftRC.subUI(window:GetContent(), RiftRC.rc)
-  RiftRC.out.ui = RiftRC.subUI(window:GetContent(), RiftRC.out)
+  RiftRC.rcframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
+  RiftRC.rcframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT', 5, 20)
+  RiftRC.rcframe:SetWidth(570)
+  RiftRC.rcframe:SetHeight(280)
+
+  RiftRC.outframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
+  RiftRC.outframe:SetPoint('BOTTOMLEFT', window:GetContent(), 'BOTTOMLEFT', 5, -32)
+  RiftRC.outframe:SetWidth(570)
+  RiftRC.outframe:SetHeight(170)
+
+  dummyframe = UI.CreateFrame('RiftTextfield', 'RiftRC', window:GetContent())
+  dummyframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT')
+
+  RiftRC.rc = Library.LibScrollyTextThing.create(RiftRC.rcframe, 'RiftRC', '',
+  	{ editable = true, autoindent = true, number = true }, 'RIGHT', RiftRC.change_rc)
+  RiftRC.out = Library.LibScrollyTextThing.create(RiftRC.outframe, 'RiftRC', '',
+  	{ number = true }, 'RIGHT', nil)
+
+  RiftRC.out.background:SetBackgroundColor(0.1, 0.1, 0.1, 0.3)
+  RiftRC.rc.background:SetBackgroundColor(0.1, 0.1, 0.1, 0.3)
 
   RiftRC.listframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.listframe:SetPoint('TOPRIGHT', window:GetContent(), 'TOPRIGHT', -5, 20)
@@ -335,13 +293,13 @@ function RiftRC.makewindow()
   RiftRC.list:display(RiftRC.sorted_buffers)
 
   local label = UI.CreateFrame("Text", "RiftRC", window)
-  label:SetPoint("TOPLEFT", RiftRC.rc.ui.background, "BOTTOMLEFT", 35, -5)
+  label:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 35, 0)
   label:SetFontColor(0.7, 0.7, 0.7, 1)
   label:SetText("Status:")
 
   RiftRC.rc_errors = UI.CreateFrame("Text", "RiftRC", window)
-  RiftRC.rc_errors:SetPoint("TOPLEFT", RiftRC.rc.ui.background, "BOTTOMLEFT", 75, -5)
-  RiftRC.rc_errors:SetPoint("BOTTOMRIGHT", RiftRC.rc.ui.background, "BOTTOMRIGHT", 0, 23)
+  RiftRC.rc_errors:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 75, 0)
+  RiftRC.rc_errors:SetPoint("BOTTOMRIGHT", RiftRC.rcframe, "BOTTOMRIGHT", 0, 23)
   RiftRC.rc_errors:SetText('')
 
   RiftRC.rc_feedback = UI.CreateFrame("Text", "RiftRC", window)
@@ -376,9 +334,9 @@ function RiftRC.makewindow()
   RiftRC.del_rcbutton:SetEnabled(false)
 
   RiftRC.load_buffer('riftrc')
-  RiftRC.show_buffer(RiftRC.out)
   RiftRC.list:display()
-  RiftRC.change_rc(1)
+  RiftRC.change_rc()
+  RiftRC.output(RiftRC.stash_value, true)
 
   return window
 end
@@ -417,8 +375,12 @@ function RiftRC.show_listitem(frametable, i, itemtable, itemindex, selected)
   local item = itemtable[itemindex]
   if item then
     local details = RiftRC.sv.buffers[item]
+    if not details then
+      RiftRC.printf("No details for name %s", item)
+    end
+    local _, lines = string.gsub(details.data, "\n", "\n")
     frametable.u.labels[i]:SetText(tostring(item))
-    frametable.u.line_counts[i]:SetText("Lines: " .. #details.data)
+    frametable.u.line_counts[i]:SetText("Lines: " .. lines)
     if selected then
       frametable.u.borders[i]:SetBackgroundColor(0.5, 0.5, 0.3, 0.8)
     else
@@ -459,10 +421,9 @@ function RiftRC.check_box(idx)
   RiftRC.list:display()
 end
 
-
 function RiftRC.load_buffer(name)
   if RiftRC.edit_buffer then
-    RiftRC.unsaved[RiftRC.edit_buffer] = RiftRC.shallowcopy(RiftRC.rc.buffer)
+    RiftRC.unsaved[RiftRC.edit_buffer] = RiftRC.buffer
   end
   if not name then
     name = RiftRC.edit_orig
@@ -471,7 +432,7 @@ function RiftRC.load_buffer(name)
     RiftRC.warn("No buffer named '%s'.", name)
     return
   end
-  RiftRC.rc.buffer = RiftRC.shallowcopy(RiftRC.unsaved[name])
+  RiftRC.buffer = RiftRC.unsaved[name]
   RiftRC.edit_buffer = name
   RiftRC.edit_orig = name
   if RiftRC.buffer_label then
@@ -499,11 +460,13 @@ function RiftRC.load_buffer(name)
       end
     end
   end
-  RiftRC.show_buffer(RiftRC.rc)
+  if RiftRC.rc and RiftRC.rc.text then
+    RiftRC.rc:text(RiftRC.buffer)
+  end
   if RiftRC.list then
     RiftRC.list:display()
   end
-  RiftRC.change_rc(1)
+  RiftRC.change_rc()
   RiftRC.message("Loaded %s.", name)
   if RiftRC.save_rcbutton then
     RiftRC.save_rcbutton:SetEnabled(false)
@@ -512,7 +475,7 @@ end
 
 function RiftRC.buffer_rename()
   RiftRC.edit_buffer = RiftRC.buffer_label:GetText()
-  if RiftRC.edit_buffer ~= RiftRC.edit_orig and RiftRC.list.buffer[RiftRC.edit_buffer] then
+  if RiftRC.edit_buffer ~= RiftRC.edit_orig and RiftRC.sv.buffers[RiftRC.edit_buffer] then
     RiftRC.save_rcbutton:SetEnabled(false)
   else
     RiftRC.save_rcbutton:SetEnabled(true)
@@ -539,6 +502,23 @@ function RiftRC.save_rc()
     RiftRC.list.u.buffers[oldname] = nil
     RiftRC.warn("Renaming %s to %s.", oldname, name)
     RiftRC.edit_orig = RiftRC.edit_buffer
+    local this_one = nil
+    for index, n in ipairs(RiftRC.list.data) do
+      if n == oldname then
+        this_one = index
+	break
+      end
+    end
+    if this_one then
+      RiftRC.list.data[this_one] = name
+      table.sort(RiftRC.list.data)
+      for index, n in ipairs(RiftRC.list.data) do
+	if n == name then
+	  RiftRC.list.selected = index
+	  break
+	end
+      end
+    end
   else
     RiftRC.warn("Saving %s.", RiftRC.edit_buffer)
   end
@@ -546,7 +526,7 @@ function RiftRC.save_rc()
   if not buff then
     RiftRC.message("Huh? Can't find buffer for '%s'.", name)
   else
-    buff.data = RiftRC.shallowcopy(RiftRC.rc.buffer)
+    buff.data = RiftRC.buffer
   end
   if RiftRC.rc_savebutton then
     RiftRC.rc_savebutton:SetEnabled(false)
@@ -554,137 +534,23 @@ function RiftRC.save_rc()
   RiftRC.list:display()
 end
 
-function RiftRC.show_buffer(ui_spec)
-  if ui_spec.ui and ui_spec.ui.scrollbar then
-    ui_spec.offset = math.floor(ui_spec.ui.scrollbar:GetPosition())
-  else
-    -- haven't got a window yet.
-    return
-  end
-  local indexed_buffer
-  if ui_spec.interact == 'fancy' then
-    indexed_buffer = {}
-    for k, v in pairs(ui_spec.buffer) do
-      table.insert(indexed_buffer, k)
-    end
-    table.sort(indexed_buffer)
-    ui_spec.indexed_buffer = indexed_buffer
-  else
-    indexed_buffer = ui_spec.buffer
-  end
-  for i = 1, ui_spec.lines do
-    local index = i + ui_spec.offset
-    local line = indexed_buffer[index]
-    if line then
-      if ui_spec.interact == 'fancy' then
-      else
-        ui_spec.ui.fields[i]:SetText(line)
-        ui_spec.ui.labels[i]:SetText(tostring(index))
-      end
-    else
-      if ui_spec.interact == 'fancy' then
-      else
-        ui_spec.ui.fields[i]:SetText('')
-        ui_spec.ui.labels[i]:SetText('')
-      end
-    end
-  end
-  RiftRC.check_scrollbar(ui_spec)
-end
-
-function RiftRC.show_riftrc()
-  RiftRC.show_buffer(RiftRC.rc)
-end
-
 function RiftRC.check_scrollbars()
-  RiftRC.check_scrollbar(RiftRC.rc)
-  RiftRC.check_scrollbar(RiftRC.out)
+  RiftRC.rc:check_scrollbar()
+  RiftRC.out:check_scrollbar()
   RiftRC.list:check_scrollbar()
 end
 
-function RiftRC.check_scrollbar(ui_spec)
-  local buffer = ui_spec.buffer
-  if ui_spec.interact == 'fancy' then
-    buffer = ui_spec.indexed_buffer
-  end
-  if #buffer > ui_spec.lines then
-    if ui_spec.ui and ui_spec.ui.scrollbar then
-      ui_spec.ui.scrollbar:SetRange(0, #buffer - ui_spec.lines)
-      ui_spec.ui.scrollbar:SetPosition(ui_spec.offset or 0)
-      ui_spec.ui.scrollbar:SetEnabled(true)
-    end
-  else
-    if ui_spec.ui and ui_spec.ui.scrollbar then
-      ui_spec.ui.scrollbar:SetEnabled(false)
-      ui_spec.ui.scrollbar:SetRange(0, 1)
-      ui_spec.ui.scrollbar:SetPosition(0)
-      ui_spec.offset = 0
-    end
-  end
-end
-
-function RiftRC.key_press(idx, event, key)
-  local field = RiftRC.rc.ui.fields[idx]
-  local text = field and field:GetText() or ''
-  local cursor = field and field:GetCursor()
-  local index = idx + RiftRC.rc.offset
-  if key then
-    if string.byte(key) == 8 then
-      if index > 1 and cursor < 1 then
-	old = RiftRC.rc.buffer[index - 1] or ''
-	RiftRC.rc.buffer[index - 1] = old .. ' ' .. text
-        table.remove(RiftRC.rc.buffer, index)
-	if RiftRC.rc.offset > 0 then
-	  RiftRC.rc.offset = RiftRC.rc.offset - 1
-	else
-	  idx = idx - 1
-	end
-	RiftRC.check_scrollbar(RiftRC.rc)
-	RiftRC.show_riftrc()
-	RiftRC.rc.ui.fields[idx]:SetKeyFocus(true)
-	RiftRC.rc.ui.fields[idx]:SetCursor(#old + 1)
-      end
-    elseif string.byte(key) == 13 then
-      local spaces = string.match(text, '^(%s*)') or ''
-      if string.find(text, '{$') or string.find(text, ' do$') or string.find(text, ' then$') then
-        spaces = spaces .. '  '
-      end
-      before = string.sub(text, 1, cursor)
-      after = string.sub(text, cursor + 1)
-      RiftRC.rc.buffer[index] = before
-      table.insert(RiftRC.rc.buffer, index + 1, spaces .. after)
-      if #RiftRC.rc.buffer > RiftRC.rc.lines then
-        RiftRC.rc.offset = RiftRC.rc.offset + 1
-      else
-        idx = idx + 1
-      end
-      RiftRC.check_scrollbar(RiftRC.rc)
-      RiftRC.show_riftrc()
-      RiftRC.rc.ui.fields[idx]:SetKeyFocus(true)
-      RiftRC.rc.ui.fields[idx]:SetCursor(#spaces)
-    end
-  end
-  --RiftRC.printf("key: [%d] cur %d %s|%s", string.byte(key) or -1,
-  --	cursor,
-  --	string.sub(text, 1, cursor), string.sub(text, cursor + 1))
-end
-
-function RiftRC.change_rc(idx)
-  if not RiftRC.rc.ui then
+function RiftRC.change_rc()
+  if not RiftRC.rc or not RiftRC.rc.text then
     return
   end
-  local new = RiftRC.rc.ui.fields[idx] and RiftRC.rc.ui.fields[idx]:GetText()
+  local new = RiftRC.rc:text()
   if new then
-    local index = idx + RiftRC.rc.offset
-    for i = 1, index do
-      RiftRC.rc.buffer[i] = RiftRC.rc.buffer[i] or ''
-    end
-    if RiftRC.rc.buffer[index] ~= new then
-      RiftRC.rc.buffer[index] = new
+    if new ~= RiftRC.buffer then
+      RiftRC.buffer = new
       RiftRC.save_rcbutton:SetEnabled(true)
     end
-    code = table.concat(RiftRC.rc.buffer, "\n")
-    func, err = loadstring(code)
+    func, err = loadstring(RiftRC.buffer)
     if func then
       RiftRC.rc_errors:SetText('OK')
       RiftRC.rc_errors:SetFontColor(0, 0.9, 0.3, 1)
@@ -694,7 +560,6 @@ function RiftRC.change_rc(idx)
       RiftRC.run_rcbutton:SetEnabled(false)
       RiftRC.rc_errors:SetFontColor(0.8, 0.2, 0.2, 1)
     end
-    RiftRC.show_riftrc()
   end
 end
 
