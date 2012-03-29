@@ -234,21 +234,21 @@ function RiftRC.makewindow()
   RiftRC.closebutton:SetPoint("TOPRIGHT", window, "TOPRIGHT", r + 5, 17)
   RiftRC.closebutton.Event.LeftPress = RiftRC.closewindow
 
-  RiftRC.buffer_label = UI.CreateFrame("RiftTextfield", "RiftRC", window)
-  RiftRC.buffer_label:SetPoint("TOPLEFT", window, "TOPLEFT", 95, 53)
-  RiftRC.buffer_label:SetHeight(20)
-  RiftRC.buffer_label:SetWidth(200)
-  RiftRC.buffer_label:SetBackgroundColor(0.1, 0.1, 0.1, 0.8)
-  RiftRC.buffer_label:SetText("edit")
-  RiftRC.buffer_label.Event.TextfieldChange = RiftRC.buffer_rename
-  RiftRC.buffer_label:SetVisible(false)
-
-  RiftRC.buffer_field = UI.CreateFrame("Text", "RiftRC", window)
+  RiftRC.buffer_field = UI.CreateFrame("RiftTextfield", "RiftRC", window)
   RiftRC.buffer_field:SetPoint("TOPLEFT", window, "TOPLEFT", 95, 53)
   RiftRC.buffer_field:SetHeight(20)
   RiftRC.buffer_field:SetWidth(200)
+  RiftRC.buffer_field:SetBackgroundColor(0.1, 0.1, 0.1, 0.8)
   RiftRC.buffer_field:SetText("edit")
-  RiftRC.buffer_field:SetVisible(true)
+  RiftRC.buffer_field.Event.TextfieldChange = RiftRC.buffer_rename
+  RiftRC.buffer_field:SetVisible(false)
+
+  RiftRC.buffer_label = UI.CreateFrame("Text", "RiftRC", window)
+  RiftRC.buffer_label:SetPoint("TOPLEFT", window, "TOPLEFT", 95, 53)
+  RiftRC.buffer_label:SetHeight(20)
+  RiftRC.buffer_label:SetWidth(200)
+  RiftRC.buffer_label:SetText("edit")
+  RiftRC.buffer_label:SetVisible(true)
 
   RiftRC.rcframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.rcframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT', 5, 20)
@@ -438,21 +438,21 @@ function RiftRC.load_buffer(name)
   RiftRC.buffer = RiftRC.unsaved[name]
   RiftRC.edit_buffer = name
   RiftRC.edit_orig = name
-  if RiftRC.buffer_label then
-    RiftRC.buffer_label:SetText(name)
-  end
   if RiftRC.buffer_field then
     RiftRC.buffer_field:SetText(name)
+  end
+  if RiftRC.buffer_label then
+    RiftRC.buffer_label:SetText(name)
   end
   if RiftRC.del_rcbutton then
     if name == 'riftrc' then
       RiftRC.del_rcbutton:SetEnabled(false)
-      RiftRC.buffer_field:SetVisible(true)
-      RiftRC.buffer_label:SetVisible(false)
+      RiftRC.buffer_label:SetVisible(true)
+      RiftRC.buffer_field:SetVisible(false)
     else
       RiftRC.del_rcbutton:SetEnabled(true)
-      RiftRC.buffer_field:SetVisible(false)
-      RiftRC.buffer_label:SetVisible(true)
+      RiftRC.buffer_label:SetVisible(false)
+      RiftRC.buffer_field:SetVisible(true)
     end
   end
   if RiftRC.list and RiftRC.list.data then
@@ -477,7 +477,7 @@ function RiftRC.load_buffer(name)
 end
 
 function RiftRC.buffer_rename()
-  RiftRC.edit_buffer = RiftRC.buffer_label:GetText()
+  RiftRC.edit_buffer = RiftRC.buffer_field:GetText()
   if RiftRC.edit_buffer ~= RiftRC.edit_orig and RiftRC.sv.buffers[RiftRC.edit_buffer] then
     RiftRC.save_rcbutton:SetEnabled(false)
   else

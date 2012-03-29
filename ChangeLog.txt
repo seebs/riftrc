@@ -1,6 +1,7 @@
 2012/03/28:
 	* Fix focus issues for new fields.
 	* Fix focus issues on close.
+	* Swap misleading names on buffer_field and buffer_label.
 
 2012/03/27:
 	* Rework display of buffer list to use LibItemList.
