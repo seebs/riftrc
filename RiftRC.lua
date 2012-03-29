@@ -39,20 +39,48 @@ function RiftRC.update()
 end
 
 function RiftRC.variables_loaded(addon)
+  RiftRC.whoami = Inspect.Unit.Detail('player').name
   if addon == 'RiftRC' then
-    RiftRC_dotRiftRC = RiftRC_dotRiftRC or { buffers = { riftrc = { data = '', autorun = true } }, }
+    RiftRC_dotRiftRC = RiftRC_dotRiftRC or {}
     RiftRC.sv = RiftRC_dotRiftRC
+
+    -- initial population
+    if not RiftRC.sv.whitelist then
+      RiftRC.sv.whitelist = { [string.lower(RiftRC.whoami)] = true }
+    end
+    if not RiftRC.sv.blacklist then
+      RiftRC.sv.blacklist = {}
+    end
     if not RiftRC.sv.buffers.riftrc then
       RiftRC.sv.buffers.riftrc = { data = '', autorun = true }
     end
+
     RiftRC.sorted_buffers = {}
+    local fix_buffers = {}
     for name, value in pairs(RiftRC.sv.buffers) do
       if type(value.data) == 'table' then
         value.data = table.concat(value.data, '\n')
       end
+      if type(name) ~= 'string' then
+        fix_buffers[name] = tostring(name)
+      end
       value.data = string.gsub(value.data, '\r', '\n')
       RiftRC.unsaved[name] = value.data
       table.insert(RiftRC.sorted_buffers, name)
+    end
+    local did_any = false
+    for k, v in pairs(fix_buffers) do
+      RiftRC.unsaved[v] = RiftRC.unsaved[k]
+      RiftRC.unsaved[k] = nil
+      RiftRC.sv.buffers[v] = RiftRC.sv.buffers[k]
+      RiftRC.sv.buffers[k] = nil
+      did_any = true
+    end
+    if did_any then
+      RiftRC.sorted_buffers = {}
+      for k, v in pairs(RiftRC.sv.buffers) do
+        table.insert(RiftRC.sorted_buffers, k)
+      end
     end
     table.sort(RiftRC.sorted_buffers)
     RiftRC.load_buffer('riftrc')
@@ -346,7 +374,7 @@ function RiftRC.makewindow()
   RiftRC.run_rcbutton:SetText("RUN")
 
   RiftRC.new_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-  RiftRC.new_rcbutton.Event.LeftPress = RiftRC.new_rc
+  RiftRC.new_rcbutton.Event.LeftPress = function() RiftRC.new_rc() end
   RiftRC.new_rcbutton:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", r - 15, b)
   RiftRC.new_rcbutton:SetText("NEW")
 
@@ -667,6 +695,7 @@ end
 function RiftRC.allow_receive_messages(state)
   if not RiftRC.messaging then
     RiftRC.printf("Cannot receive messages without messaging support.")
+    return
   end
   local found_event
   for i, v in ipairs(Event.Message.Receive) do
@@ -712,8 +741,6 @@ function RiftRC.slashcommand(args)
     end
     if args.w then
       args.w = string.lower(args.w)
-      RiftRC.sv.whitelist = RiftRC.sv.whitelist or {}
-      RiftRC.sv.blacklist = RiftRC.sv.blacklist or {}
       RiftRC.sv.whitelist[args.w] = true
       if RiftRC.sv.blacklist[args.w] then
         RiftRC.sv.blacklist[args.w] = nil
@@ -724,8 +751,6 @@ function RiftRC.slashcommand(args)
     end
     if args.b then
       args.b = string.lower(args.b)
-      RiftRC.sv.blacklist = RiftRC.sv.blacklist or {}
-      RiftRC.sv.whitelist = RiftRC.sv.whitelist or {}
       RiftRC.sv.blacklist[args.b] = true
       if RiftRC.sv.whitelist[args.b] then
         RiftRC.sv.whitelist[args.b] = nil

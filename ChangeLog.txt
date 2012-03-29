@@ -1,3 +1,7 @@
+2012/03/29:
+	* Default to whitelisting self (meaning whitelisting is on)
+	* Clean up initialization of whitelist/blacklist.
+
 2012/03/28:
 	* Fix focus issues for new fields.
 	* Fix focus issues on close.
@@ -5,6 +9,7 @@
 	* Add support for sending and receiving code snippets.
 	* Don't enable autorun on snippets that start with code.
 	* On second thought, don't use loadstring either.
+	* Correct bogus buffer names.
 
 2012/03/27:
 	* Rework display of buffer list to use LibItemList.
