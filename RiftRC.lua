@@ -56,6 +56,14 @@ function RiftRC.variables_loaded(addon)
     end
     table.sort(RiftRC.sorted_buffers)
     RiftRC.load_buffer('riftrc')
+    if RiftRC.messaging then
+      RiftRC.allow_receive_messages(RiftRC.sv.receive_messages)
+      if RiftRC.sv.receive_messages then
+        RiftRC.printf("EXPERIMENTAL messaging support added!")
+      else
+        RiftRC.printf("Messaging support added, but receive is disabled!")
+      end
+    end
   end
 end
 
@@ -73,7 +81,7 @@ function RiftRC.run_buffers()
       end
     end
     if #skipped > 0 then
-      RiftRC.printf("Skipped: ", table.concat(skipped, ', '))
+      RiftRC.printf("Skipped: %s", table.concat(skipped, ', '))
     end
   else
     RiftRC.printf("run_buffers: Didn't find buffers.")
@@ -146,20 +154,32 @@ function RiftRC.closewindow()
   end
 end
 
-function RiftRC.new_rc()
-  local new_name
-  for i = 1, 100 do
-    new_name = 'untitled ' .. i
-    if not RiftRC.list.u.buffers[new_name] then
-      break
+function RiftRC.new_rc(name, data)
+  base_name = name or 'untitled'
+  if RiftRC.sv.buffers[base_name] then
+    local new_name
+    for i = 1, 100 do
+      new_name = base_name .. ' ' .. i
+      if not RiftRC.sv.buffers[new_name] then
+        break
+      end
     end
+    if RiftRC.sv.buffers[new_name] then
+      RiftRC.printf("Couldn't create a new name based on '%s'.", base_name)
+      return
+    end
+    name = new_name
+  else
+    name = base_name
   end
   RiftRC.output(nil)
-  RiftRC.unsaved[new_name] = ''
-  RiftRC.list.u.buffers[new_name] = { autorun = true, data = '' }
-  table.insert(RiftRC.list.data, new_name)
-  RiftRC.list:display()
-  RiftRC.load_buffer(new_name)
+  RiftRC.unsaved[name] = data or ''
+  RiftRC.sv.buffers[name] = { autorun = not data, data = data or '' }
+  if RiftRC.list then
+    table.insert(RiftRC.list.data, name)
+    RiftRC.list:display()
+  end
+  RiftRC.load_buffer(name)
 end
 
 function RiftRC.del_rc()
@@ -253,12 +273,12 @@ function RiftRC.makewindow()
   RiftRC.rcframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.rcframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT', 5, 20)
   RiftRC.rcframe:SetWidth(575)
-  RiftRC.rcframe:SetHeight(280)
+  RiftRC.rcframe:SetHeight(265)
 
   RiftRC.outframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.outframe:SetPoint('BOTTOMLEFT', window:GetContent(), 'BOTTOMLEFT', 5, -32)
   RiftRC.outframe:SetWidth(575)
-  RiftRC.outframe:SetHeight(170)
+  RiftRC.outframe:SetHeight(177)
 
   dummyframe = UI.CreateFrame('RiftTextfield', 'RiftRC', window:GetContent())
   dummyframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT')
@@ -297,7 +317,7 @@ function RiftRC.makewindow()
 
   local label = UI.CreateFrame("Text", "RiftRC", window)
   label:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 31, 0)
-  label:SetFontColor(0.7, 0.7, 0.7, 1)
+  label:SetFontColor(0.9, 0.9, 0.8, 1)
   label:SetText("Status:")
 
   RiftRC.rc_errors = UI.CreateFrame("Text", "RiftRC", window)
@@ -306,9 +326,9 @@ function RiftRC.makewindow()
   RiftRC.rc_errors:SetText('')
 
   RiftRC.rc_feedback = UI.CreateFrame("Text", "RiftRC", window)
-  RiftRC.rc_feedback:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", l + 39, b - 10)
+  RiftRC.rc_feedback:SetPoint("TOPLEFT", RiftRC.rc_errors, "BOTTOMLEFT", 0, -2)
   RiftRC.rc_feedback:SetText('')
-  label:SetFontColor(0.8, 0.8, 0.8, 1)
+  RiftRC.rc_feedback:SetFontColor(0.8, 0.8, 0.8, 1)
 
   RiftRC.revert_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
   RiftRC.revert_rcbutton.Event.LeftPress = function() RiftRC.load_buffer() end
@@ -335,6 +355,21 @@ function RiftRC.makewindow()
   RiftRC.del_rcbutton:SetPoint("BOTTOMRIGHT", RiftRC.new_rcbutton, "BOTTOMLEFT", 5, 0)
   RiftRC.del_rcbutton:SetText("DELETE")
   RiftRC.del_rcbutton:SetEnabled(false)
+
+  -- If there's a messaging API, let us... GO WILD!
+  if RiftRC.messaging then
+    RiftRC.send_field = UI.CreateFrame("RiftTextfield", "RiftRC", window)
+    RiftRC.send_field:SetPoint("TOPLEFT", RiftRC.outframe, "BOTTOMLEFT", 100, 5)
+    RiftRC.send_field:SetHeight(22)
+    RiftRC.send_field:SetWidth(200)
+    RiftRC.send_field:SetBackgroundColor(0.1, 0.1, 0.1, 0.8)
+    RiftRC.send_field:SetText(RiftRC.sv.default_send or 'name')
+
+    RiftRC.send_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
+    RiftRC.send_rcbutton.Event.LeftPress = RiftRC.send_rc
+    RiftRC.send_rcbutton:SetPoint("TOPLEFT", RiftRC.send_field, "TOPRIGHT", 0, -6)
+    RiftRC.send_rcbutton:SetText("SEND")
+  end
 
   RiftRC.load_buffer('riftrc')
   RiftRC.list:display()
@@ -566,6 +601,59 @@ function RiftRC.change_rc()
   end
 end
 
+function RiftRC.sent(failure, message)
+  if failure then
+    RiftRC.printf("failure: %s (message %s)", tostring(failure), tostring(message))
+  else
+    RiftRC.printf("send was okay")
+  end
+end
+
+function RiftRC.send_rc()
+  if not RiftRC.send_field then
+    RiftRC.printf("Can't send without a send field.")
+  end
+  local to = RiftRC.send_field:GetText()
+  RiftRC.sv.default_send = to
+  local send_me = RiftRC.edit_buffer .. '\1' .. RiftRC.buffer
+  local compress = zlib.deflate(zlib.BEST_COMPRESSION)
+  local compressed, eof, bytes_in, bytes_out = compress(send_me, "finish")
+  Command.Message.Send(to, 'riftrc_rc', compressed, RiftRC.sent)
+  RiftRC.printf("Sent %s [%d bytes, compressed %d] to %s.",
+    RiftRC.edit_buffer, bytes_in, bytes_out, to)
+end
+
+function RiftRC.message_receive(from, msgtype, channel, identifier, data)
+  if msgtype ~= 'send' or identifier ~= 'riftrc_rc' then
+    return
+  end
+  if RiftRC.sv.blacklist and RiftRC.sv.blacklist[string.lower(from)] then
+    RiftRC.printf("Blacklisted a message from %s.", from)
+    return
+  end
+  local found_any = false
+  if RiftRC.sv.whitelist then
+    for _, _ in pairs(RiftRC.sv.whitelist) do
+      found_any = true
+      break
+    end
+    if found_any and not RiftRC.sv.whitelist[string.lower(from)] then
+      RiftRC.printf("Received a message from %s, but not whitelisted.", from)
+      return
+    end
+  end
+
+  RiftRC.printf("Processing a message from %s.", from)
+  local expand = zlib.inflate()
+  local inflated, eof, bytes_in, bytes_out = expand(data)
+  local name, data = string.match(inflated, '([^\1]*)\1(.*)')
+  if name and data then
+    RiftRC.new_rc(name, data)
+  else
+    RiftRC.warn("Failed to load code received from %s: %s", from, err)
+  end
+end
+
 function RiftRC.gui()
   RiftRC.ui = RiftRC.ui or UI.CreateContext("RiftRC")
   RiftRC.window = RiftRC.window or RiftRC.makewindow()
@@ -573,6 +661,31 @@ function RiftRC.gui()
     RiftRC.window:SetVisible(true)
   else
     RiftRC.printf("Can't display GUI.")
+  end
+end
+
+function RiftRC.allow_receive_messages(state)
+  if not RiftRC.messaging then
+    RiftRC.printf("Cannot receive messages without messaging support.")
+  end
+  local found_event
+  for i, v in ipairs(Event.Message.Receive) do
+    if v[1] == RiftRC.message_receive then
+      found_event = i
+    end
+  end
+  if state then
+    RiftRC.printf("Allowing incoming messages.")
+    if not found_event then
+      table.insert(Event.Message.Receive, { RiftRC.message_receive, "RiftRC", "message hook" })
+    end
+    Command.Message.Accept('send', 'riftrc_rc')
+  else
+    RiftRC.printf("Disallowing incoming messages.")
+    if found_event then
+      table.remove(Event.Message.Receive, found_event)
+    end
+    Command.Message.Reject('send', 'riftrc_rc')
   end
 end
 
@@ -586,6 +699,41 @@ function RiftRC.slashcommand(args)
   if not args then
     RiftRC.printf("Usage error.")
     return
+  end
+  if not RiftRC.messaging then
+    if args.b or args.m or args.w then
+      RiftRC.printf("The -b, -m, and -w options are only supported when messaging is available (1.8).")
+      return
+    end
+  else
+    if args.m then
+      RiftRC.sv.receive_messages = not RiftRC.sv.receive_messages
+      RiftRC.allow_receive_messages(RiftRC.sv.receive_messages)
+    end
+    if args.w then
+      args.w = string.lower(args.w)
+      RiftRC.sv.whitelist = RiftRC.sv.whitelist or {}
+      RiftRC.sv.blacklist = RiftRC.sv.blacklist or {}
+      RiftRC.sv.whitelist[args.w] = true
+      if RiftRC.sv.blacklist[args.w] then
+        RiftRC.sv.blacklist[args.w] = nil
+        RiftRC.printf("Whitelisted %s, REMOVING existing blacklist!", args.w)
+      else
+        RiftRC.printf("Whitelisted %s.", args.w)
+      end
+    end
+    if args.b then
+      args.b = string.lower(args.b)
+      RiftRC.sv.blacklist = RiftRC.sv.blacklist or {}
+      RiftRC.sv.whitelist = RiftRC.sv.whitelist or {}
+      RiftRC.sv.blacklist[args.b] = true
+      if RiftRC.sv.whitelist[args.b] then
+        RiftRC.sv.whitelist[args.b] = nil
+        RiftRC.printf("Blacklisted %s, REMOVING existing whitelist!", args.b)
+      else
+        RiftRC.printf("Blacklisted %s.", args.b)
+      end
+    end
   end
   if args.l then
     RiftRC.live = not RiftRC.live
@@ -632,8 +780,13 @@ function RiftRC.slashcommand(args)
   end
 end
 
-Library.LibGetOpt.makeslash("elnr", "RiftRC", "rc", RiftRC.slashcommand)
+if Command.Message then
+  RiftRC.messaging = true
+end
+
+Library.LibGetOpt.makeslash("b:elmnrw:", "RiftRC", "rc", RiftRC.slashcommand)
 
 table.insert(Event.System.Update.Begin, { RiftRC.update, "RiftRC", "update hook" })
 table.insert(Event.Addon.SavedVariables.Load.End, { RiftRC.variables_loaded, "RiftRC", "variable loaded hook" })
 table.insert(Event.Addon.Startup.End, { RiftRC.run_buffers, "RiftRC", "run riftrc" })
+

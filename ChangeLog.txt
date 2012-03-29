@@ -2,6 +2,9 @@
 	* Fix focus issues for new fields.
 	* Fix focus issues on close.
 	* Swap misleading names on buffer_field and buffer_label.
+	* Add support for sending and receiving code snippets.
+	* Don't enable autorun on snippets that start with code.
+	* On second thought, don't use loadstring either.
 
 2012/03/27:
 	* Rework display of buffer list to use LibItemList.
