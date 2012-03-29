@@ -140,6 +140,9 @@ end
 function RiftRC.closewindow()
   if RiftRC.window then
     RiftRC.window:SetVisible(false)
+    if RiftRC.rc and RiftRC.rc.textarea then
+      RiftRC.rc.textarea:SetKeyFocus(false)
+    end
   end
 end
 
@@ -152,7 +155,7 @@ function RiftRC.new_rc()
     end
   end
   RiftRC.output(nil)
-  RiftRC.unsaved[new_name] = {}
+  RiftRC.unsaved[new_name] = ''
   RiftRC.list.u.buffers[new_name] = { autorun = true, data = '' }
   table.insert(RiftRC.list.data, new_name)
   RiftRC.list:display()
@@ -235,7 +238,7 @@ function RiftRC.makewindow()
   RiftRC.buffer_label:SetPoint("TOPLEFT", window, "TOPLEFT", 95, 53)
   RiftRC.buffer_label:SetHeight(20)
   RiftRC.buffer_label:SetWidth(200)
-  RiftRC.buffer_label:SetBackgroundColor(0.4, 0.4, 0.4, 0.8)
+  RiftRC.buffer_label:SetBackgroundColor(0.1, 0.1, 0.1, 0.8)
   RiftRC.buffer_label:SetText("edit")
   RiftRC.buffer_label.Event.TextfieldChange = RiftRC.buffer_rename
   RiftRC.buffer_label:SetVisible(false)
@@ -249,12 +252,12 @@ function RiftRC.makewindow()
 
   RiftRC.rcframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.rcframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT', 5, 20)
-  RiftRC.rcframe:SetWidth(570)
+  RiftRC.rcframe:SetWidth(575)
   RiftRC.rcframe:SetHeight(280)
 
   RiftRC.outframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.outframe:SetPoint('BOTTOMLEFT', window:GetContent(), 'BOTTOMLEFT', 5, -32)
-  RiftRC.outframe:SetWidth(570)
+  RiftRC.outframe:SetWidth(575)
   RiftRC.outframe:SetHeight(170)
 
   dummyframe = UI.CreateFrame('RiftTextfield', 'RiftRC', window:GetContent())
@@ -265,8 +268,8 @@ function RiftRC.makewindow()
   RiftRC.out = Library.LibScrollyTextThing.create(RiftRC.outframe, 'RiftRC', '',
   	{ number = true }, 'RIGHT', nil)
 
-  RiftRC.out.background:SetBackgroundColor(0.1, 0.1, 0.1, 0.3)
-  RiftRC.rc.background:SetBackgroundColor(0.1, 0.1, 0.1, 0.3)
+  RiftRC.out.background:SetBackgroundColor(0.1, 0.1, 0.1, 0.9)
+  RiftRC.rc.background:SetBackgroundColor(0.1, 0.1, 0.1, 0.9)
 
   RiftRC.listframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.listframe:SetPoint('TOPRIGHT', window:GetContent(), 'TOPRIGHT', -5, 20)
@@ -293,13 +296,13 @@ function RiftRC.makewindow()
   RiftRC.list:display(RiftRC.sorted_buffers)
 
   local label = UI.CreateFrame("Text", "RiftRC", window)
-  label:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 35, 0)
+  label:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 31, 0)
   label:SetFontColor(0.7, 0.7, 0.7, 1)
   label:SetText("Status:")
 
   RiftRC.rc_errors = UI.CreateFrame("Text", "RiftRC", window)
-  RiftRC.rc_errors:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 75, 0)
-  RiftRC.rc_errors:SetPoint("BOTTOMRIGHT", RiftRC.rcframe, "BOTTOMRIGHT", 0, 23)
+  RiftRC.rc_errors:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 70, 0)
+  RiftRC.rc_errors:SetPoint("TOPRIGHT", RiftRC.rcframe, "BOTTOMRIGHT", 0, 0)
   RiftRC.rc_errors:SetText('')
 
   RiftRC.rc_feedback = UI.CreateFrame("Text", "RiftRC", window)
@@ -378,9 +381,9 @@ function RiftRC.show_listitem(frametable, i, itemtable, itemindex, selected)
     if not details then
       RiftRC.printf("No details for name %s", item)
     end
-    local _, lines = string.gsub(details.data, "\n", "\n")
+    local _, lines = string.gsub(details.data, "[\n\r]", "\n")
     frametable.u.labels[i]:SetText(tostring(item))
-    frametable.u.line_counts[i]:SetText("Lines: " .. lines)
+    frametable.u.line_counts[i]:SetText("Lines: " .. lines + 1)
     if selected then
       frametable.u.borders[i]:SetBackgroundColor(0.5, 0.5, 0.3, 0.8)
     else

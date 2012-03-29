@@ -1,5 +1,12 @@
+2012/03/28:
+	* Fix focus issues for new fields.
+	* Fix focus issues on close.
+
 2012/03/27:
 	* Rework display of buffer list to use LibItemList.
+	* Rework display of everything else to use LibScrollyTextThing.
+	* Editor now uses RiftTextfield, so arrow keys and such work.
+	* Whoops, found a stray {} that shoulda been ''
 
 2012/03/26:
 	* Fix errors handling returns and backspaces in some cases.
