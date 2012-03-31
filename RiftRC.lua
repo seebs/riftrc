@@ -594,8 +594,8 @@ function RiftRC.save_rc()
   else
     buff.data = RiftRC.buffer
   end
-  if RiftRC.rc_savebutton then
-    RiftRC.rc_savebutton:SetEnabled(false)
+  if RiftRC.save_rcbutton then
+    RiftRC.save_rcbutton:SetEnabled(false)
   end
   RiftRC.list:display()
 end

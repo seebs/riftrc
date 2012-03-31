@@ -1,3 +1,8 @@
+2012/03/30:
+	* Disable save button after saving.
+	* Update LibScrollyTextThing, making autoindent and scrollbar more
+	  reliable.
+
 2012/03/29:
 	* Default to whitelisting self (meaning whitelisting is on)
 	* Clean up initialization of whitelist/blacklist.
