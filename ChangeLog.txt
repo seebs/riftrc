@@ -1,3 +1,9 @@
+2012/06/22:
+	* TOC update, etc.
+
+2012/03/31:
+	* Shuffle sides a bit for an update to LSTT.
+
 2012/03/30:
 	* Disable save button after saving.
 	* Update LibScrollyTextThing, making autoindent and scrollbar more

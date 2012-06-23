@@ -39,8 +39,13 @@ function RiftRC.update()
 end
 
 function RiftRC.variables_loaded(addon)
-  RiftRC.whoami = Inspect.Unit.Detail('player').name
   if addon == 'RiftRC' then
+    local me = Inspect.Unit.Detail('player')
+    if me then
+      RiftRC.whoami = me.name
+    else
+      RiftRC.printf("No name in 'player'?")
+    end
     RiftRC_dotRiftRC = RiftRC_dotRiftRC or {}
     RiftRC.sv = RiftRC_dotRiftRC
 
@@ -280,7 +285,7 @@ function RiftRC.makewindow()
   RiftRC.closebutton = UI.CreateFrame("RiftButton", "RiftRC", window)
   RiftRC.closebutton:SetSkin("close")
   RiftRC.closebutton:SetPoint("TOPRIGHT", window, "TOPRIGHT", r + 5, 17)
-  RiftRC.closebutton.Event.LeftPress = RiftRC.closewindow
+  RiftRC.closebutton.Event.LeftClick = RiftRC.closewindow
 
   RiftRC.buffer_field = UI.CreateFrame("RiftTextfield", "RiftRC", window)
   RiftRC.buffer_field:SetPoint("TOPLEFT", window, "TOPLEFT", 95, 53)
@@ -301,12 +306,12 @@ function RiftRC.makewindow()
   RiftRC.rcframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.rcframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT', 5, 20)
   RiftRC.rcframe:SetWidth(575)
-  RiftRC.rcframe:SetHeight(265)
+  RiftRC.rcframe:SetHeight(269)
 
   RiftRC.outframe = UI.CreateFrame('Frame', 'RiftRC', window:GetContent())
   RiftRC.outframe:SetPoint('BOTTOMLEFT', window:GetContent(), 'BOTTOMLEFT', 5, -32)
   RiftRC.outframe:SetWidth(575)
-  RiftRC.outframe:SetHeight(177)
+  RiftRC.outframe:SetHeight(169)
 
   dummyframe = UI.CreateFrame('RiftTextfield', 'RiftRC', window:GetContent())
   dummyframe:SetPoint('TOPLEFT', window:GetContent(), 'TOPLEFT')
@@ -344,13 +349,13 @@ function RiftRC.makewindow()
   RiftRC.list:display(RiftRC.sorted_buffers)
 
   local label = UI.CreateFrame("Text", "RiftRC", window)
-  label:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 31, 0)
+  label:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 31, 2)
   label:SetFontColor(0.9, 0.9, 0.8, 1)
   label:SetText("Status:")
 
   RiftRC.rc_errors = UI.CreateFrame("Text", "RiftRC", window)
-  RiftRC.rc_errors:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 70, 0)
-  RiftRC.rc_errors:SetPoint("TOPRIGHT", RiftRC.rcframe, "BOTTOMRIGHT", 0, 0)
+  RiftRC.rc_errors:SetPoint("TOPLEFT", RiftRC.rcframe, "BOTTOMLEFT", 70, 2)
+  RiftRC.rc_errors:SetPoint("TOPRIGHT", RiftRC.rcframe, "BOTTOMRIGHT", 0, 2)
   RiftRC.rc_errors:SetText('')
 
   RiftRC.rc_feedback = UI.CreateFrame("Text", "RiftRC", window)
@@ -359,27 +364,27 @@ function RiftRC.makewindow()
   RiftRC.rc_feedback:SetFontColor(0.8, 0.8, 0.8, 1)
 
   RiftRC.revert_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-  RiftRC.revert_rcbutton.Event.LeftPress = function() RiftRC.load_buffer() end
+  RiftRC.revert_rcbutton.Event.LeftClick = function() RiftRC.load_buffer() end
   RiftRC.revert_rcbutton:SetPoint("TOPRIGHT", window, "TOPRIGHT", r - 72, 45)
   RiftRC.revert_rcbutton:SetText("REVERT")
 
   RiftRC.save_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-  RiftRC.save_rcbutton.Event.LeftPress = RiftRC.save_rc
+  RiftRC.save_rcbutton.Event.LeftClick = RiftRC.save_rc
   RiftRC.save_rcbutton:SetPoint("TOPRIGHT", RiftRC.revert_rcbutton, "TOPLEFT", 5, 0)
   RiftRC.save_rcbutton:SetText("SAVE")
 
   RiftRC.run_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-  RiftRC.run_rcbutton.Event.LeftPress = RiftRC.run_rc
+  RiftRC.run_rcbutton.Event.LeftClick = RiftRC.run_rc
   RiftRC.run_rcbutton:SetPoint("TOPRIGHT", RiftRC.save_rcbutton, "TOPLEFT", 5, 0)
   RiftRC.run_rcbutton:SetText("RUN")
 
   RiftRC.new_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-  RiftRC.new_rcbutton.Event.LeftPress = function() RiftRC.new_rc() end
+  RiftRC.new_rcbutton.Event.LeftClick = function() RiftRC.new_rc() end
   RiftRC.new_rcbutton:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", r - 15, b)
   RiftRC.new_rcbutton:SetText("NEW")
 
   RiftRC.del_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-  RiftRC.del_rcbutton.Event.LeftPress = RiftRC.del_rc
+  RiftRC.del_rcbutton.Event.LeftClick = RiftRC.del_rc
   RiftRC.del_rcbutton:SetPoint("BOTTOMRIGHT", RiftRC.new_rcbutton, "BOTTOMLEFT", 5, 0)
   RiftRC.del_rcbutton:SetText("DELETE")
   RiftRC.del_rcbutton:SetEnabled(false)
@@ -394,7 +399,7 @@ function RiftRC.makewindow()
     RiftRC.send_field:SetText(RiftRC.sv.default_send or 'name')
 
     RiftRC.send_rcbutton = UI.CreateFrame("RiftButton", "RiftRC", window)
-    RiftRC.send_rcbutton.Event.LeftPress = RiftRC.send_rc
+    RiftRC.send_rcbutton.Event.LeftClick = RiftRC.send_rc
     RiftRC.send_rcbutton:SetPoint("TOPLEFT", RiftRC.send_field, "TOPRIGHT", 0, -6)
     RiftRC.send_rcbutton:SetText("SEND")
   end
